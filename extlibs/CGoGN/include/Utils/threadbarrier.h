@@ -21,87 +21,63 @@
 * Contact information: cgogn@unistra.fr                                        *
 *                                                                              *
 *******************************************************************************/
+#ifndef __BARRIER_THREAD__
+#define __BARRIER_THREAD__
 
-#ifndef __EMBEDDED_GMAP3_H__
-#define __EMBEDDED_GMAP3_H__
 
-#include "Topology/gmap/gmap3.h"
-#include "Topology/generic/mapImpl/mapMono.h"
+#include <boost/thread/thread.hpp>
+#include <boost/thread/barrier.hpp>
+#include <boost/thread/condition_variable.hpp>
+
 
 namespace CGoGN
 {
 
-/**
-* Class of 3-dimensional G-maps
-* with managed embeddings
-*/
-class EmbeddedGMap3 : public GMap3<MapMono>
+namespace Utils
 {
-	EmbeddedGMap3(const EmbeddedGMap3& m):GMap3<MapMono>(m) {}
+
+/**
+* Implementation of simple counter barrier (rdv)
+* for boost::thread
+*/
+class Barrier
+{
+private:
+	unsigned int m_initCount;
+	unsigned int m_count;
+	unsigned int m_generation;
+	
+	boost::mutex m_protect;
+	boost::condition_variable  m_cond;
+
 public:
-	typedef MapMono IMPL;
-	typedef GMap3<MapMono> TOPO_MAP;
-
-	static const unsigned int DIMENSION = TOPO_MAP::DIMENSION ;
-
-	EmbeddedGMap3() {}
-
-	/*!
-	 *
-	 */
-	virtual Dart deleteVertex(Dart d);
-
-	//! Cut the edge of d
-	/*! @param d a dart of the edge to cut
-	 */
-	virtual Dart cutEdge(Dart d);
-
-	/*! The attributes attached to the edge of d are kept on the resulting edge
-	 *  @param d a dart of the edge to cut
-	 */
-	virtual bool uncutEdge(Dart d);
-
-	//!
-	/*!
-	 */
-	virtual Dart deleteEdge(Dart d);
-
-	/*!
-	 *
-	 */
-	virtual void splitFace(Dart d, Dart e);
-
-	/*!
-	 *
-	 */
-	virtual void sewVolumes(Dart d, Dart e, bool withBoundary = true);
-
-	/*!
-	 *
-	 */
-	virtual void unsewVolumes(Dart d);
-
-	/*!
-	 *
-	 */
-	virtual bool mergeVolumes(Dart d);
-
-	/*!
-	 *
-	 */
-	virtual void splitVolume(std::vector<Dart>& vd);
 
 	/**
-	 * No attribute is attached to the new volume
-	 */
-	virtual unsigned int closeHole(Dart d);
+	* constructor
+	* @param count number of threads to syncronize
+	*/
+	inline Barrier(unsigned int count):
+		m_initCount(count), m_count(count), m_generation(0) {}
+	
+	inline bool wait()
+	{
+                boost::unique_lock<boost::mutex> lock(m_protect);
+		unsigned int gen = m_generation;
+		if (--m_count == 0)
+		{
+			m_generation++;
+			m_count = m_initCount;
+			m_cond.notify_all();
+			return true;
+		}
 
-	/*!
-	 *
-	 */
-	virtual bool check();
-} ;
+		while (gen == m_generation)
+			m_cond.wait(lock);
+		return false;
+	}
+};
 
-} // namespace CGoGN
+}
+}
 
 #endif
