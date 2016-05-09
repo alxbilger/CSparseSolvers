@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 2.8.12)
 project(Sofa)
 
+set(SOFA_KERNEL_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/SofaKernel/")
+
 ## Default build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
@@ -41,7 +43,9 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 ## Environment
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules")
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/SofaFramework")
+list(APPEND CMAKE_MODULE_PATH "${SOFA_KERNEL_SOURCE_DIR}/cmake")
+list(APPEND CMAKE_MODULE_PATH "${SOFA_KERNEL_SOURCE_DIR}/cmake/Modules")
+list(APPEND CMAKE_MODULE_PATH "${SOFA_KERNEL_SOURCE_DIR}/SofaFramework")
 list(APPEND CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR})
 list(APPEND CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR}/extlibs)
 list(APPEND CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR}/applications/plugins)
@@ -102,16 +106,11 @@ if(NOT WIN32)
 endif(NOT WIN32)
 
 
-## Try to find an installed boost. If boost is not found, use miniBoost.
-find_package(Boost QUIET)
-if(NOT Boost_FOUND)
-    add_subdirectory(extlibs/miniBoost)
-endif()
-
+## Boost is now mandatory.
+find_package(Boost REQUIRED)
 
 ### Dependency pack for Windows
 if(MSVC)
-
     #define BOOST_ALL_DYN_LINK needed for dynamic linking with boost libraries
     add_definitions(-DBOOST_ALL_DYN_LINK)
 
@@ -161,10 +160,10 @@ if(SOFA_INSTALL_RESOURCES_FILES)
     # directory, it contains to relative paths to the installed resource directory.
     set(SHARE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/share")
     set(EXAMPLES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/examples")
-    configure_file(etc/sofa.ini.in "${CMAKE_BINARY_DIR}/etc/sofa.ini")
+    configure_file(${SOFA_KERNEL_SOURCE_DIR}/etc/sofa.ini.in "${CMAKE_BINARY_DIR}/etc/sofa.ini")
     set(SHARE_DIR "../share/sofa")
     set(EXAMPLES_DIR "../share/sofa/examples")
-    configure_file(etc/sofa.ini.in "${CMAKE_BINARY_DIR}/etc/installedSofa.ini")
+    configure_file(${SOFA_KERNEL_SOURCE_DIR}/etc/sofa.ini.in "${CMAKE_BINARY_DIR}/etc/installedSofa.ini")
     install(FILES "${CMAKE_BINARY_DIR}/etc/installedSofa.ini" DESTINATION etc RENAME sofa.ini)
 endif()
 
@@ -192,56 +191,49 @@ add_subdirectory(extlibs)
 
 ### Main Sofa subdirectories
 
-add_subdirectory(SofaFramework)
-add_subdirectory(SofaSimulation)
+add_subdirectory(${SOFA_KERNEL_SOURCE_DIR}/SofaFramework)
+add_subdirectory(${SOFA_KERNEL_SOURCE_DIR}/SofaSimulation)
 if(SOFA_BUILD_TESTS)
     # Depends on SofaSimulation
     add_subdirectory(tools/SofaGTestMain)
 endif()
-add_subdirectory(SofaBase)
-add_subdirectory(SofaCommon)
+add_subdirectory(${SOFA_KERNEL_SOURCE_DIR}/SofaBase)
+add_subdirectory(${SOFA_KERNEL_SOURCE_DIR}/SofaCommon)
+add_subdirectory(SofaGeneral)
+add_subdirectory(SofaAdvanced)
+add_subdirectory(SofaMisc)
+add_subdirectory(SofaGui)
 
-option(SOFA_BUILD_PACKAGES_EXTENSIONS "Compile General, Advanced, Misc and GUIs packages." OFF)
+# SofaTest depends on SofaPython, so we add SofaPython before SofaTest.
+sofa_add_plugin( applications/plugins/SofaPython SofaPython )
 
-if(SOFA_BUILD_PACKAGES_EXTENSIONS)
-    add_subdirectory(SofaGeneral)
-    add_subdirectory(SofaAdvanced)
-    add_subdirectory(SofaMisc)
-    add_subdirectory(SofaGui)
-
-
-    # SofaTest depends on SofaPython, so we add SofaPython before SofaTest.
-    sofa_add_plugin( applications/plugins/SofaPython SofaPython )
-
-    if(SOFA_BUILD_TESTS)
-        # Library used by SofaTest.
-        add_subdirectory(applications/plugins/SceneCreator SceneCreator)
-        # Library used to write high level tests involving many components.
-        add_subdirectory(applications/plugins/SofaTest SofaTest)
-        # Tests for all the modules, written using SofaTest.
-        add_subdirectory(modules/tests)
-        # SofaPython_test is a special case, because it depends on
-        # SofaTest, which depends on SofaPython...
-        if(PLUGIN_SOFAPYTHON)
-            add_subdirectory(applications/plugins/SofaPython/SofaPython_test)
-        endif()
-
-        # Not sure what is it
-        add_subdirectory(applications/plugins/SofaTest/SofaTest_test SofaTest/SofaTest_test)
+if(SOFA_BUILD_TESTS)
+    # Library used by SofaTest.
+    add_subdirectory(applications/plugins/SceneCreator SceneCreator)
+    # Library used to write high level tests involving many components.
+    add_subdirectory(applications/plugins/SofaTest SofaTest)
+    # Tests for all the modules, written using SofaTest.
+    add_subdirectory(modules/tests)
+    # SofaPython_test is a special case, because it depends on
+    # SofaTest, which depends on SofaPython...
+    if(PLUGIN_SOFAPYTHON)
+        add_subdirectory(applications/plugins/SofaPython/SofaPython_test)
     endif()
 
-    ## Plugins
-    add_subdirectory(applications/plugins)
+    # Not sure what is it
+    add_subdirectory(applications/plugins/SofaTest/SofaTest_test SofaTest/SofaTest_test)
+endif()
 
-    ## Applications
-    add_subdirectory(applications/projects)
+## Plugins
+add_subdirectory(applications/plugins)
 
-    ## Tutorials
-    option(SOFA_BUILD_TUTORIALS "Build (most of) the tutorials available." OFF)
-    if(SOFA_BUILD_TUTORIALS)
-        add_subdirectory(applications/tutorials)
-    endif()
+## Applications
+add_subdirectory(applications/projects)
 
+## Tutorials
+option(SOFA_BUILD_TUTORIALS "Build (most of) the tutorials available." OFF)
+if(SOFA_BUILD_TUTORIALS)
+    add_subdirectory(applications/tutorials)
 endif()
 
 ## Build external projects at the same time
